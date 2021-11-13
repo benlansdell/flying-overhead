@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Local flight tracker {% endblock %}</h1>
+
+<div id="location_text">
+<p>Location determined by your IP -- not as accurate</p>
+</div>
+
+Audio alert given whenever plane within a radius of {{ overhead_radius | safe }} miles (roughly the area highlighted).
+
+<div id="map" style="height: 400px"></div>
+
+<form>
+<input type="checkbox" id="mutesound" name="mutesound" value="Muted" checked>
+<label for="mutesound">Mute sound</label>
+</form>
+
+<h3>Flights</h3>
+
+All planes within {{ pm_miles | safe }} miles. Last queried 
+
+<div id="flight_table">{{ table | safe }}</div>
+
+<h3>Column keys</h3> 
+
+{{ column_keys | safe }}
+   
+<audio muted src="static/media/planeoverhead.mp3" type="audio/mp3" id="planesound">
+    Your browser does not support the audio tag.
+</audio> 
+    
+<script>
+
+    function play_sound(soundObj) {
+        var sound = document.getElementById(soundObj);
+        if (!document.getElementById('mutesound').checked) {
+            sound.muted = false;
+            sound.play();
+        }
+    }
+
+    function check_if_overhead() {
+        $.ajax({
+                type: "GET",
+                url: "{{ url_for('check_overhead')}}",
+                data: {},
+                success: function(response) {
+                                console.log(response);
+                                if (response['overhead'] == true) {
+                                    play_sound("planesound");
+                                }
+                            },
+                failure: function(xhr) {
+                                console.log("Couldn't check if overhead");
+                            }
+                });
+    }
+
+    function update_flights(pos) {
+                $.ajax({
+                type: "GET",
+                url: "{{ url_for('flights')}}",
+                data: pos,
+                success: function(response) {
+                                $("#flight_table").html(response);
+                            },
+                failure: function(xhr) {
+                                $("#flight_table").html("Couldn't get flights from OpenSky");
+                            }
+                });
+
+                //check if any are close by
+                check_if_overhead();
+            }
+
+    function initMap() {
+        
+        const pm_miles = {{ overhead_radius }};
+        const interval = {{ update_interval }};
+
+        var pos = {}, mymap = L.map('map').setView({{ default_location }}, 11);
+        L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+            maxZoom: 18,
+            id: 'mapbox/streets-v11',
+            tileSize: 512,
+            zoomOffset: -1,
+            accessToken: '{{ mapbox_key | safe }}'
+        }).addTo(mymap);
+
+
+        // Try HTML5 geolocation.
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+            pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+    
+            L.marker(pos).addTo(mymap)
+
+            const miles_per_deg_lat = 69.1;
+            const miles_per_deg_lng = 69.1*Math.cos(pos['lat']/180*Math.PI);
+            lat_pm = pm_miles/miles_per_deg_lat;
+            lng_pm = pm_miles/miles_per_deg_lng;
+
+            var polygon = L.polygon([
+                            [pos['lat']-lat_pm, pos['lng']-lng_pm],
+                            [pos['lat']+lat_pm, pos['lng']-lng_pm],
+                            [pos['lat']+lat_pm, pos['lng']+lng_pm],
+                            [pos['lat']-lat_pm, pos['lng']+lng_pm]
+                        ]).addTo(mymap);
+
+            mymap.setView(pos);
+            //This is the JS route... however it seems to lead to CORS issues
+            //display_flights(pos);
+
+            //So instead, here we send the position back to the server, and have
+            //it figure out a more accurate set of flights... Not the most efficient
+            //but oh well. It's only a hobby project.
+
+            update_flights(pos);
+            //Also replace location text:
+            let container = document.getElementById("location_text");
+            container.innerHTML = "<p>Location determined by your browser</p>";
+    
+            // Set this to run every X seconds
+            var t=setInterval(() => update_flights(pos), interval);
+
+            }, function() {
+                handleLocationError(true, mymap.getCenter());
+            });
+        } else {
+            // Browser doesn't support Geolocation
+            handleLocationError(false, mymap.getCenter());
+        }
+    }
+    
+    function handleLocationError(browserHasGeolocation, pos) {
+
+    }
+    
+    initMap();
+
+</script>
+
+{% endblock %}
+
+<!--
+    Our JS attempt. Foiled by CORS error from OpenSky API? Should be able to get this to work...
+    const get_flights = async (pos) => {
+
+        const pm = 1;
+        const lat = pos['lat'];
+        const long = pos['lng'];
+        console.log(pos);
+        console.log(lat, long)
+        params = {
+            'lamin': lat-pm,
+            'lomin': long-pm,
+            'lamax': lat+pm,
+            'lomax': long+pm
+            }
+
+        const response = await fetch('https://opensky-network.org/api/states/all', {
+            method: 'POST',
+            mode:'no-cors',
+            body: JSON.stringify(params), // string or object
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            credentials: "same-origin"
+        });
+        const myJson = await response.json(); //extract JSON from the http response
+        // do something with myJson
+        consolve.log(myJson);
+        return(myJson);
+    }
+
+    async function display_flights(pos) {
+
+        let html = "This works...";
+        let flights = get_flights(pos);
+        let container = document.querySelector(".flight_table");
+        container.innerHTML = flights; 
+
+    }
+
+
+-->
