@@ -21,3 +21,5 @@ Displays local planes in the air and (if unmuted) plays a sound whenever a plane
 This flask/JS app queries the OpenSky [REST API](https://opensky-network.org/apidoc/rest.html) for local flight information using location information returned by [IPStack](https://ipstack.com/). If the user gives permission, the page instead uses HTML5 geolocation for much more accurate location info. It generates a map using leaflet.js and [MapBox](https://www.mapbox.com/). 
 
 This is only meant to be run locally, for your own amusement. You must update `private_keys.py` with your own API keys for these services to work. 
+
+![screenshot](assets/screenshot.png)
