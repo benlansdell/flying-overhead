@@ -14,7 +14,7 @@ Will run the app on localhost:5000.
 
 ## What it does
 
-(If unmuted) Plays a sound whenever a plane is directly overhead, so you can quickly identify it. 
+Displays local planes in the air and (if unmuted) plays a sound whenever a plane is directly overhead, so you can quickly identify it. 
 
 ## How it does it
 
